@@ -1,0 +1,18 @@
+# Scaling Example - docker-compose.override.yml
+# This file demonstrates how to scale WordPress containers for production
+# Copy this as docker-compose.override.yml and adjust as needed
+
+version: "3.8"
+
+services:
+  wordpress:
+    # Deploy with 3 replicas for load balancing
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M

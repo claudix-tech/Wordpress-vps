@@ -1,0 +1,43 @@
+# Environment variables with sensitive data
+.env
+.env.local
+.env.*.local
+
+# Docker volumes and data
+mysql_data/
+wp-content/uploads/
+wp-content/backup/
+
+# SSL certificates
+certs/
+vhost.d/
+html/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+docker-compose.override.yml
+
+# Backups
+*.sql
+*.sql.gz
+backup/
+backups/
