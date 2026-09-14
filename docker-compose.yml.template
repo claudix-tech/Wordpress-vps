@@ -1,0 +1,75 @@
+version: "3.9"
+
+services:
+  # MySQL Database Service
+  db_{{INSTANCE_NAME}}:
+    image: mysql:8.0
+    container_name: wp-db-{{INSTANCE_NAME}}
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data_{{INSTANCE_NAME}}:/var/lib/mysql
+    networks:
+      - wordpress_network_{{INSTANCE_NAME}}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # WordPress Service
+  wordpress_{{INSTANCE_NAME}}:
+    image: wordpress:latest-php8.2-apache
+    container_name: wp-app-{{INSTANCE_NAME}}
+    restart: always
+    depends_on:
+      db_{{INSTANCE_NAME}}:
+        condition: service_healthy
+    ports:
+      - "${WP_PORT}:80"
+    environment:
+      WORDPRESS_DB_HOST: db_{{INSTANCE_NAME}}:3306
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE}
+      WORDPRESS_DB_USER: ${MYSQL_USER}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WP_TABLE_PREFIX}
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_MEMORY_LIMIT', '256M');
+        define('WP_MAX_MEMORY_LIMIT', '512M');
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+      - ./wp-config-extra.php:/usr/local/etc/php/conf.d/wordpress.ini
+    networks:
+      - wordpress_network_{{INSTANCE_NAME}}
+    labels:
+      - "com.wordpress.instance={{INSTANCE_NAME}}"
+
+  # phpMyAdmin Service
+  phpmyadmin_{{INSTANCE_NAME}}:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: wp-pma-{{INSTANCE_NAME}}
+    restart: always
+    depends_on:
+      - db_{{INSTANCE_NAME}}
+    ports:
+      - "${PMA_PORT}:80"
+    environment:
+      PMA_HOST: db_{{INSTANCE_NAME}}
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      PMA_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    networks:
+      - wordpress_network_{{INSTANCE_NAME}}
+    labels:
+      - "com.wordpress.instance={{INSTANCE_NAME}}"
+
+networks:
+  wordpress_network_{{INSTANCE_NAME}}:
+    driver: bridge
+
+volumes:
+  mysql_data_{{INSTANCE_NAME}}:
+    driver: local

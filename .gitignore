@@ -1,43 +1,41 @@
-# Environment variables with sensitive data
+# Environment files with credentials
 .env
 .env.local
 .env.*.local
 
 # Docker volumes and data
-mysql_data/
-wp-content/uploads/
-wp-content/backup/
+instances/*/data/
+instances/*/.volumes/
+instances/*/mysql/
 
-# SSL certificates
-certs/
-vhost.d/
-html/
+# WordPress content
+instances/*/wp-content/uploads/
+instances/*/wp-content/plugins/
+instances/*/wp-content/themes/
 
-# IDE and editor files
+# Backups
+backups/
+*.sql
+*.tar.gz
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
-.DS_Store
 
-# OS files
+# OS
+.DS_Store
 Thumbs.db
+
+# Node modules (if using any build tools)
+node_modules/
+npm-debug.log
 
 # Logs
 *.log
 logs/
 
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Docker
-docker-compose.override.yml
-
-# Backups
-*.sql
-*.sql.gz
-backup/
-backups/
+# Cache
+.cache/
+.tmp/

@@ -1,505 +1,567 @@
-# WordPress Docker VPS Boilerplate
+# WordPress Docker Multi-Instance Manager
 
-**Production-ready Docker boilerplate for deploying WordPress instances on a VPS**
+A comprehensive Docker-based WordPress management system that enables you to create, manage, and run multiple independent WordPress instances. Each instance is completely isolated with its own database, containers, network, and ports.
 
-This repository contains a complete, reusable boilerplate for quickly deploying one or multiple WordPress instances on a VPS with full automation, SSL support, and instance management capabilities.
+## Features
 
-## ⭐ Features
+✅ **Fully Isolated Instances** - Each WordPress installation has its own:
+- MySQL database container
+- WordPress Apache container  
+- phpMyAdmin interface
+- Docker network
+- Persistent volumes
+- Unique ports
 
-- 🐳 **Docker & Docker Compose** - Complete containerized WordPress setup
-- 🔒 **SSL/HTTPS** - Automatic Let's Encrypt certificate generation and renewal
-- 🛡️ **NGINX Reverse Proxy** - Production-grade reverse proxy
-- 📊 **PHPMyAdmin** - Database management interface
-- 🚀 **Multi-Instance Support** - Deploy multiple WordPress sites from one boilerplate
-- 🔄 **Backup & Restore** - Automated backup scripts with database and file support
-- 📈 **Scalability** - Easy to scale WordPress containers for high traffic
-- 🔐 **Security** - Best practices built-in (strong passwords, environment variables, permissions)
-- 🎯 **Easy Deployment** - One-command setup via deployment script
-- 📝 **Comprehensive Documentation** - Full guides for development, staging, and production
+✅ **Easy Management**
+- Interactive menu-driven interface
+- Command-line interface for automation
+- Automatic port detection to avoid conflicts
+- Secure password generation
+- Comprehensive logging
 
----
+✅ **Production-Ready**
+- Environment variable support for sensitive data
+- Health checks for containers
+- Memory optimization settings
+- Docker best practices
+- Backup and restore functionality
 
-## 🚀 Quick Start - Single Instance
+✅ **Comprehensive Documentation**
+- Per-instance README files
+- Inline script documentation
+- Usage examples
+- Troubleshooting guides
 
-### Prerequisites
+## Prerequisites
 
-- Docker and Docker Compose installed on your VPS
-- Ubuntu 22.04 LTS or later (recommended)
-- A domain name pointing to your VPS
-- Root or sudo access
+- Docker (v20.10 or later)
+- Docker Compose (v2.0 or later)
+- Linux/macOS or Windows with WSL2
+- Bash shell
+- Basic command-line knowledge
 
-### One-Line Deployment
+### Installation
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install docker.io docker-compose
+sudo usermod -aG docker $USER
+```
+
+**macOS (with Homebrew):**
+```bash
+brew install docker docker-compose
+```
+
+**Windows:**
+- Install Docker Desktop with WSL2 backend
+- https://www.docker.com/products/docker-desktop
+
+## Quick Start
+
+### 1. Clone/Navigate to the Repository
+```bash
+cd ~/Documents/work/clients/Rych/Wordpress-vps
+```
+
+### 2. Create Your First Instance
+
+**Interactive Mode:**
+```bash
+./wp-manager.sh
+# Select option 1 and follow prompts
+```
+
+**Command Line Mode:**
+```bash
+# Syntax: ./wp-manager.sh create <instance_name> [wp_port] [pma_port]
+./wp-manager.sh create mysite 8080 8081
+```
+
+This will:
+- Create instance directory at `instances/mysite/`
+- Generate secure MySQL passwords
+- Create environment configuration (`.env`)
+- Generate `docker-compose.yml` with unique service names
+- Create instance README with all details
+
+### 3. Start the Instance
+```bash
+./wp-manager.sh start mysite
+```
+
+Wait for containers to be healthy (usually 30-60 seconds)
+
+### 4. Access WordPress
+Open your browser:
+- **WordPress**: http://localhost:8080
+- **phpMyAdmin**: http://localhost:8081
+
+### 5. Complete WordPress Setup
+1. Select language → Continue
+2. Fill in database info (pre-populated if using the setup wizard)
+3. Add site title, username, password, email
+4. Click "Install WordPress"
+5. Login with your credentials
+
+## Usage Guide
+
+### Interactive Menu
+```bash
+./wp-manager.sh
+```
+
+Shows numbered menu options:
+1. Create new instance
+2. Start instance
+3. Stop instance
+4. List instances
+5. Backup instance
+6. Delete instance
+7. Exit
+
+### Command-Line Interface
+
+**Create Instance:**
+```bash
+# Auto-detect ports
+./wp-manager.sh create shop
+
+# Specify custom ports
+./wp-manager.sh create shop 8080 8081
+./wp-manager.sh create blog 8090 8091
+./wp-manager.sh create api 9000 9001
+```
+
+**Start/Stop:**
+```bash
+./wp-manager.sh start mysite
+./wp-manager.sh stop mysite
+```
+
+**List All Instances:**
+```bash
+./wp-manager.sh list
+```
+
+Output example:
+```
+  Name: mysite
+  Status: RUNNING
+  WordPress: http://localhost:8080
+  phpMyAdmin: http://localhost:8081
+
+  Name: shop
+  Status: STOPPED
+  WordPress: http://localhost:8090
+  phpMyAdmin: http://localhost:8091
+```
+
+**Backup Instance:**
+```bash
+./wp-manager.sh backup mysite
+```
+
+Creates:
+- Database dump: `instances/mysite/backups/db-backup-20240914-120000.sql`
+- Files archive: `instances/mysite/backups/files-backup-20240914-120000.tar.gz`
+
+**Delete Instance:**
+```bash
+./wp-manager.sh delete mysite
+```
+
+⚠️ This will:
+- Stop all containers
+- Remove volumes
+- Delete the instance directory
+- Requires confirmation
+
+## Instance Directory Structure
+
+```
+instances/
+└── mysite/
+    ├── .env                          # Instance configuration (DO NOT COMMIT)
+    ├── docker-compose.yml            # Docker services definition
+    ├── README.md                      # Instance-specific documentation
+    ├── .dockerignore                 # Docker build ignore file
+    ├── wp-content/
+    │   ├── uploads/                  # User uploaded files
+    │   ├── plugins/                  # WordPress plugins
+    │   └── themes/                   # WordPress themes
+    └── backups/
+        ├── db-backup-*.sql           # Database backups
+        └── files-backup-*.tar.gz      # File archives
+```
+
+## Environment Configuration
+
+Each instance has a `.env` file with configuration:
+
+```env
+# MySQL Configuration
+MYSQL_ROOT_PASSWORD=...              # Root password
+MYSQL_DATABASE=wordpress_mysite      # Database name
+MYSQL_USER=wp_mysite                 # Database user
+MYSQL_PASSWORD=...                   # Database user password
+
+# WordPress Configuration
+WP_TABLE_PREFIX=wp_                  # WordPress table prefix
+WP_PORT=8080                         # WordPress access port
+PMA_PORT=8081                        # phpMyAdmin access port
+
+# Instance Metadata
+INSTANCE_NAME=mysite
+INSTANCE_DOMAIN=localhost:8080
+INSTANCE_EMAIL=admin@mysite.local
+```
+
+### ⚠️ Important Security Notes
+
+1. **Never commit `.env` files to git** - They contain passwords
+2. **Change default passwords** - Generated automatically, but verify
+3. **Use HTTPS in production** - Requires additional SSL configuration
+4. **Regular backups** - Use the backup command regularly
+5. **Keep images updated** - Update Docker images periodically
+
+## Docker Services per Instance
+
+### MySQL Database Container
+- **Name**: `wp-db-{instance_name}`
+- **Image**: `mysql:8.0`
+- **Port**: Internal only (3306)
+- **Volumes**: Persistent database storage
+- **Health Check**: Automatically restarts if unhealthy
+
+### WordPress Container
+- **Name**: `wp-app-{instance_name}`
+- **Image**: `wordpress:latest-php8.2-apache`
+- **Port**: Configurable (default 8080)
+- **Volumes**: wp-content directory
+- **Features**: Apache2, PHP 8.2, WordPress CLI ready
+
+### phpMyAdmin Container
+- **Name**: `wp-pma-{instance_name}`
+- **Image**: `phpmyadmin/phpmyadmin:latest`
+- **Port**: Configurable (default 8081)
+- **Access**: Database management UI
+
+### Network
+- **Name**: `wordpress_network_{instance_name}`
+- **Type**: Bridge network
+- **Purpose**: Isolated container-to-container communication
+
+## Backup & Restore
+
+### Manual Database Backup
+```bash
+cd instances/mysite
+
+# Backup
+docker exec wp-db-mysite mysqldump -u wp_mysite -p$MYSQL_PASSWORD wordpress_mysite > backups/manual-backup.sql
+
+# Restore
+docker exec -i wp-db-mysite mysql -u wp_mysite -p$MYSQL_PASSWORD wordpress_mysite < backups/manual-backup.sql
+```
+
+### Manual Files Backup
+```bash
+cd instances/mysite
+
+# Backup entire wp-content
+tar -czf backups/files-backup.tar.gz wp-content/
+
+# Restore
+tar -xzf backups/files-backup.tar.gz
+```
+
+### Automated Backup Script
+
+Create `backup-all.sh`:
+```bash
+#!/bin/bash
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR/instances"
+
+for instance_dir in */; do
+    instance_name="${instance_dir%/}"
+    echo "Backing up $instance_name..."
+    $SCRIPT_DIR/wp-manager.sh backup "$instance_name"
+done
+```
+
+Run with cron:
+```bash
+chmod +x backup-all.sh
+
+# Add to crontab (daily at 2 AM)
+0 2 * * * /path/to/backup-all.sh
+```
+
+## Troubleshooting
+
+### Containers Won't Start
+
+**Check logs:**
+```bash
+cd instances/mysite
+docker-compose logs
+```
+
+**Common issues:**
+- Port already in use → Change `WP_PORT` or `PMA_PORT` in `.env`
+- Insufficient disk space → Free up space
+- Docker daemon not running → Start Docker service
+
+### Database Connection Error
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/yourusername/wordpress-vps/main/deploy.sh | bash
+# Verify database container is running
+docker-compose ps
+
+# Check database logs
+docker-compose logs wp-db-mysite
+
+# Restart database
+docker-compose restart db_mysite
 ```
 
-Or clone and deploy:
+### WordPress Installation Page Not Loading
 
 ```bash
-git clone https://github.com/yourusername/wordpress-vps.git
-cd wordpress-vps
-chmod +x deploy.sh
-./deploy.sh
-```
+# Wait longer for startup (first boot can take 2-3 minutes)
+sleep 120
 
-The deployment script will:
-1. ✅ Check Docker installation
-2. ✅ Prompt for configuration (instance name, domain, email)
-3. ✅ Generate secure passwords
-4. ✅ Create all necessary directories
-5. ✅ Pull Docker images
-6. ✅ Start and verify all services
+# Check WordPress container logs
+docker-compose logs wp-app-mysite
 
-**That's it!** Your WordPress site is ready at `https://your_domain.com`
-
----
-
-## 📁 Boilerplate Structure
-
-```
-wordpress-vps/
-├── docker-compose.yml              # Production Docker setup
-├── docker-compose.override.yml.example  # Scaling example
-├── .env                            # Environment variables (auto-generated)
-├── .env.example                    # Configuration template
-├── .env.production                 # Production reference
-├── deploy.sh                       # Deployment script
-├── setup.sh                        # Setup helper
-├── manage-instances.sh             # Multi-instance management
-├── README.md                       # This file
-├── DEPLOYMENT_GUIDE.md             # Complete guide
-├── wp-content/                     # WordPress plugins & themes
-├── certs/                          # SSL certificates
-├── vhost.d/                        # NGINX configs
-├── html/                           # NGINX web root
-├── backups/                        # Backups directory
-├── logs/                           # Application logs
-└── mysql_data/                     # Database volume (git-ignored)
-```
-
----
-
-## 🌍 Deployment
-
-### Single VPS Instance
-
-Deploy one WordPress site:
-
-```bash
-./deploy.sh
-```
-
-### Multiple VPS Instances
-
-Manage multiple WordPress sites on same VPS:
-
-```bash
-sudo manage-instances.sh create wordpress_prod_01 blog1.com admin@blog1.com
-sudo manage-instances.sh create wordpress_prod_02 blog2.com admin@blog2.com
-```
-
-Each instance is completely isolated with its own database, files, config, and SSL certificate.
-
----
-
-## 🛠️ Configuration
-
-All credentials are in `.env` (excluded from git for security):
-
-```bash
-# Instance naming
-INSTANCE_NAME=wordpress_prod_01
-
-# MySQL
-MYSQL_VERSION=8.0
-MYSQL_ROOT_PASSWORD=your_secure_password
-MYSQL_DATABASE=wordpress_db
-MYSQL_USER=wordpress_user
-MYSQL_PASSWORD=your_secure_db_password
-
-# WordPress
-WP_VERSION=latest
-WP_DEBUG=false
-WORDPRESS_TABLE_PREFIX=wp_
-
-# Domain and SSL
-DOMAIN_NAME=your_domain.com
-LETSENCRYPT_EMAIL=your_email@your_domain.com
-
-# PHPMyAdmin
-PHPMYADMIN_PORT=8080
-```
-
-⚠️ **Security:** Always use strong, unique passwords. Generate with:
-```bash
-openssl rand -base64 32
-```
-
----
-
-## 🎯 Instance Management
-
-### Single Instance
-
-```bash
-# View logs
-docker compose logs -f wordpress
-
-# Stop containers
-docker compose down
-
-# Restart services
-docker compose restart
-
-# Check status
-docker compose ps
-```
-
-### Multiple Instances
-
-```bash
-# List all instances
-sudo manage-instances.sh list
-
-# Create new instance
-sudo manage-instances.sh create wordpress_prod_02 blog2.com admin@blog2.com
-
-# Start instance
-sudo manage-instances.sh start wordpress_prod_01
-
-# Stop instance
-sudo manage-instances.sh stop wordpress_prod_01
-
-# View instance info
-sudo manage-instances.sh info wordpress_prod_01
-
-# View logs
-sudo manage-instances.sh logs wordpress_prod_01
-
-# Backup instance
-sudo manage-instances.sh backup wordpress_prod_01
-
-# Restore from backup
-sudo manage-instances.sh restore wordpress_prod_01 backups/backup_file.tar.gz
-```
-
----
-
-## 💾 Backup & Recovery
-
-### Automated Backup
-
-```bash
-# Single instance
-sudo manage-instances.sh backup wordpress_prod_01
-
-# Cron for daily backups (add to crontab -e)
-0 2 * * * /usr/local/bin/manage-instances.sh backup wordpress_prod_01
-```
-
-### Manual Backup
-
-**Database only:**
-
-```bash
-docker compose exec db mysqldump -u wordpress_user -p wordpress_db > backup.sql
-```
-
-**Files only:**
-
-```bash
-tar -czf wordpress_files.tar.gz wp-content/
-```
-
-**Complete:**
-
-```bash
-tar -czf wordpress_backup.tar.gz \
-  --exclude='mysql_data' \
-  --exclude='certs' \
-  --exclude='.git' \
-  .
-```
-
-### Restore from Backup
-
-**Complete restore:**
-
-```bash
-docker compose down
-rm -rf wp-content mysql_data
-tar -xzf backup_file.tar.gz
-docker compose up -d
-```
-
-**Database restore:**
-
-```bash
-docker compose exec -i db mysql -u wordpress_user -p wordpress_db < backup.sql
-```
-
----
-
-## 🔒 SSL/HTTPS
-
-### Automatic Setup (Recommended)
-
-Let's Encrypt is automatically configured:
-
-```bash
-DOMAIN_NAME=your_domain.com
-LETSENCRYPT_EMAIL=your_email@your_domain.com
-```
-
-Certificates are automatically:
-- Generated on first deployment
-- Renewed before expiration
-- Stored in `./certs/`
-
-### Manual Renewal
-
-```bash
-docker compose exec letsencrypt /app/force_renew
-docker compose restart nginx-proxy
-```
-
----
-
-## 🚀 Services Overview
-
-### MySQL Database
-- Latest MySQL image
-- Persistent data storage
-- Health checks enabled
-- Automatic backups support
-
-### WordPress Application
-- Latest WordPress image
-- Custom wp-content mounting
-- Debug logging (configurable)
-- Auto-scaling support
-
-### PHPMyAdmin
-- Database management UI
-- Port: 8080 (configurable)
-- Secure credentials from .env
-
-### NGINX Reverse Proxy
-- Production-grade proxy
-- Automatic virtual host management
-- HTTP/HTTPS routing
-- Performance optimization
-
-### Let's Encrypt SSL
-- Automatic certificate generation
-- Auto-renewal before expiration
-- Wildcard certificate support
-
----
-
-## 📊 Monitoring & Logs
-
-### View Logs
-
-```bash
-# All services
-docker compose logs
-
-# Specific service
-docker compose logs wordpress
-docker compose logs db
-docker compose logs nginx-proxy
-
-# Real-time
-docker compose logs -f wordpress
-
-# Last 100 lines
-docker compose logs --tail=100 wordpress
-```
-
-### Container Health
-
-```bash
-# Check all containers
-docker compose ps
-
-# Resource usage
-docker stats
-
-# Detailed inspection
-docker inspect wordpress_app
-```
-
----
-
-## 🔧 Troubleshooting
-
-### WordPress Not Accessible
-
-```bash
-# Check container status
-docker compose ps
-
-# View WordPress logs
-docker compose logs wordpress
-
-# Verify DNS
-nslookup your_domain.com
-
-# Check ports
-sudo netstat -tulpn | grep LISTEN
-```
-
-### Database Connection Issues
-
-```bash
-# Test connectivity
-docker compose exec wordpress wp db check
-
-# View database logs
-docker compose logs db
-
-# Connect to MySQL
-docker compose exec db mysql -u wordpress_user -p wordpress_db
-```
-
-### SSL Certificate Issues
-
-```bash
-# Check certificate
-docker compose exec nginx-proxy cat /etc/nginx/certs/your_domain.com.crt
-
-# View Let's Encrypt logs
-docker compose logs letsencrypt
-
-# Renew certificate
-docker compose exec letsencrypt /app/force_renew
+# Check Apache configuration
+docker exec wp-app-mysite apache2ctl status
 ```
 
 ### Port Already in Use
 
 ```bash
-# Find process using port 80
-sudo lsof -i :80
+# Find which process is using the port
+lsof -i :8080
 
-# Kill process
-sudo kill -9 <PID>
+# Kill the process
+kill -9 <PID>
 
-# Or use different port in .env
-PHPMYADMIN_PORT=8081
+# Or change the port in .env
+nano instances/mysite/.env
+# Modify WP_PORT=8080 to WP_PORT=8090
+docker-compose down
+docker-compose up -d
 ```
 
----
+### High Memory Usage
 
-## 📚 Full Documentation
+Modify WordPress memory limits in `docker-compose.yml`:
+```yaml
+WORDPRESS_CONFIG_EXTRA: |
+  define('WP_MEMORY_LIMIT', '128M');  # Reduce if needed
+  define('WP_MAX_MEMORY_LIMIT', '256M');
+```
 
-For comprehensive guides on:
-- VPS deployment strategies
-- Multi-instance setup
-- Performance optimization
-- Security hardening
-- Disaster recovery
-
-👉 See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
-
----
-
-## 🔐 Security Best Practices
-
-### Essential
-
-✅ Change all default passwords  
-✅ Use strong passwords (16+ characters)  
-✅ Enable HTTPS (Let's Encrypt)  
-✅ Regular backups  
-✅ Configure firewall  
-✅ Update system regularly  
-
-### Recommended
-
-🔐 Use WordPress security plugins  
-🔐 Enable 2FA for admin  
-🔐 Limit database access  
-🔐 Monitor access logs  
-🔐 Implement WAF  
-🔐 Set proper file permissions (644/755)  
-
-### Environment File Security
+### Reset Instance to Clean State
 
 ```bash
-# Restrict .env permissions
-chmod 600 .env
+cd instances/mysite
+docker-compose down -v        # Stop and remove volumes
+rm -rf wp-content/*           # Remove WordPress files
+docker-compose up -d          # Start fresh
+```
 
-# Add to .gitignore
+## Advanced Configuration
+
+### Enable HTTPS with Let's Encrypt
+
+See [HTTPS_SETUP.md](HTTPS_SETUP.md) for detailed instructions on adding:
+- NGINX reverse proxy
+- Automatic SSL certificates
+- Domain configuration
+
+### Multi-Instance Database Replication
+
+For high-availability setups, see [REPLICATION.md](REPLICATION.md)
+
+### Performance Tuning
+
+See [PERFORMANCE.md](PERFORMANCE.md) for:
+- Redis caching
+- Database optimization
+- CDN integration
+- Memory and CPU allocation
+
+### Custom WordPress Plugins
+
+Plugins are mounted from `instances/{name}/wp-content/plugins/`
+
+```bash
+# Add plugin directory
+mkdir -p instances/mysite/wp-content/plugins/my-plugin
+
+# Copy plugin files
+cp -r ~/my-wordpress-plugin/* instances/mysite/wp-content/plugins/my-plugin/
+
+# Enable in WordPress admin panel
+```
+
+### Custom WordPress Themes
+
+```bash
+# Add theme directory
+mkdir -p instances/mysite/wp-content/themes/my-theme
+
+# Copy theme files
+cp -r ~/my-wordpress-theme/* instances/mysite/wp-content/themes/my-theme/
+
+# Select in WordPress Settings → Appearance → Themes
+```
+
+## Git Workflow
+
+### Initialize Repository
+```bash
+cd instances/mysite
+git init
+git add .
+
+# But NEVER commit these:
 echo ".env" >> .gitignore
-echo "*.env" >> .gitignore
+echo "wp-content/uploads/" >> .gitignore
+echo "backups/" >> .gitignore
+echo "*.sql" >> .gitignore
 
-# Never commit sensitive data
+git commit -m "Initial WordPress setup"
 ```
 
----
+### Version Control Best Practices
 
-## 📈 Scaling
+Track these:
+- ✅ `docker-compose.yml` - Container configuration
+- ✅ `wp-content/plugins/` - Custom plugins
+- ✅ `wp-content/themes/` - Custom themes
+- ✅ `.env.template` - Template only, not actual `.env`
 
-### Scale WordPress Containers
+Don't track:
+- ❌ `.env` - Contains passwords
+- ❌ `wp-content/uploads/` - User uploads
+- ❌ Database dumps
+- ❌ Full WordPress core (regenerate from image)
+
+## Scaling to Production
+
+### Domain Configuration
 
 ```bash
-# Run 3 WordPress containers
-docker compose up -d --scale wordpress=3
+# Update .env
+INSTANCE_DOMAIN=mysite.example.com
+INSTANCE_EMAIL=admin@mysite.example.com
+
+# Update docker-compose.yml labels for SSL
+labels:
+  - "VIRTUAL_HOST=mysite.example.com"
+  - "LETSENCRYPT_HOST=mysite.example.com"
+  - "LETSENCRYPT_EMAIL=admin@mysite.example.com"
 ```
-
-### Load Balancing
-
-NGINX automatically load balances across WordPress containers.
 
 ### Database Optimization
 
 ```bash
-# Connect to MySQL
-docker compose exec db mysql -u wordpress_user -p
+# SSH into database container
+docker exec -it wp-db-mysite mysql -u root -p
 
-# Run optimization
-OPTIMIZE TABLE wp_posts;
-OPTIMIZE TABLE wp_postmeta;
-OPTIMIZE TABLE wp_comments;
+# Optimize tables
+OPTIMIZE TABLE wordpress_mysite.wp_posts;
+OPTIMIZE TABLE wordpress_mysite.wp_postmeta;
+OPTIMIZE TABLE wordpress_mysite.wp_comments;
 ```
 
+### Resource Limits
+
+Update `docker-compose.yml`:
+```yaml
+wordpress_mysite:
+  deploy:
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 512M
+      reservations:
+        cpus: '0.5'
+        memory: 256M
+```
+
+## Monitoring
+
+### Container Status
+```bash
+# Overall status
+./wp-manager.sh list
+
+# Detailed status
+docker-compose ps
+docker-compose stats
+```
+
+### Logs
+```bash
+# All logs
+docker-compose logs -f
+
+# Last 100 lines, follow updates
+docker-compose logs -f --tail=100
+
+# Just WordPress
+docker-compose logs -f wp-app-mysite
+
+# Just database
+docker-compose logs -f db_mysite
+```
+
+### Health Check
+```bash
+# Manual health check
+docker exec wp-db-mysite mysqladmin ping -h localhost
+curl http://localhost:8080/wp-admin/
+```
+
+## Support & Documentation
+
+- [Hostinger Tutorial](https://www.hostinger.com/tutorials/run-docker-wordpress/)
+- [Docker Documentation](https://docs.docker.com/)
+- [Docker Compose Reference](https://docs.docker.com/compose/compose-file/)
+- [WordPress Documentation](https://wordpress.org/support/)
+- [MySQL Documentation](https://dev.mysql.com/doc/)
+
+## License
+
+This project follows the same license as WordPress (GPLv2 or later).
+
+## Contributing
+
+To improve this tool:
+1. Test thoroughly with multiple instances
+2. Document any new features
+3. Update this README
+4. Share improvements with the team
+
+## Changelog
+
+### v1.0 (Initial Release)
+- ✅ Create independent WordPress instances
+- ✅ Interactive and CLI management
+- ✅ Automatic port detection
+- ✅ Backup/restore functionality
+- ✅ Environment-based configuration
+- ✅ Per-instance documentation
+
 ---
 
-## 🤝 Support & Resources
-
-- 📖 [Docker Documentation](https://docs.docker.com/)
-- 📖 [Docker Compose Docs](https://docs.docker.com/compose/)
-- 📖 [WordPress Docker Hub](https://hub.docker.com/_/wordpress)
-- 📖 [Let's Encrypt Docs](https://letsencrypt.org/docs/)
-- 📖 [NGINX Proxy GitHub](https://github.com/jwilder/nginx-proxy)
-
----
-
-## 📝 File Descriptions
-
-| File | Purpose |
-|------|---------|
-| `docker-compose.yml` | Production Docker setup with NGINX, Let's Encrypt |
-| `docker-compose.dev.yml` | Development setup with direct port access |
-| `deploy.sh` | Interactive deployment script |
-| `setup.sh` | Automated setup (legacy) |
-| `manage-instances.sh` | Multi-instance management tool |
-| `.env.dev` | Development configuration template |
-| `.env.staging` | Staging configuration template |
-| `.env.production` | Production configuration template |
-| `DEPLOYMENT_GUIDE.md` | Comprehensive deployment documentation |
-
----
-
-## 📄 License
-
-This boilerplate is provided as-is for educational and production use.
-
----
-
-**Last Updated:** September 13, 2026  
-**Version:** 2.0 - Production Boilerplate  
-**Status:** Production Ready  
-**Maintained By:** Your Organization
+**Last Updated**: September 14, 2024
+**Maintained by**: Your Team
+**Questions?** Contact your DevOps team or check the troubleshooting section
