@@ -32,7 +32,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    image: wordpress:${WP_VERSION:-latest}-apache
+    image: wordpress:${WP_VERSION:-latest}
     container_name: ${INSTANCE_NAME}_wordpress
     restart: ${RESTART_POLICY:-always}
     environment:
