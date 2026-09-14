@@ -53,29 +53,19 @@ Your WordPress Docker setup has been transformed into a **production-ready, reus
   - Disaster recovery procedures
   - Scaling strategies
 
-### 4. **Environment Templates**
+### 4. **Production Configuration**
 
-#### `.env.dev` - Development Environment
-- No SSL/HTTPS
-- Direct port access (8001)
-- Debug logging enabled
-- Simple database credentials
-- Perfect for local testing
+#### `.env.example` - Configuration Template
+- Ready-to-use production template
+- All settings documented
+- Secure credential placeholders
 
-#### `.env.staging` - Staging Environment
-- Full SSL/HTTPS support
-- NGINX reverse proxy
-- Enhanced security
-- Pre-production ready
-- Testing environment
+#### `.env.production` - Reference
+- Fully documented production environment
+- All available options explained
+- Security hardened defaults
 
-#### `.env.production` - Production Environment
-- Maximum security settings
-- Production-grade configuration
-- Requires custom credentials
-- Intended for real deployments
-
-### 5. **Enhanced docker-compose.yml** - Production Configuration
+### 6. **Enhanced docker-compose.yml** - Production Configuration
 - **Improvements:**
   - Flexible naming via `INSTANCE_NAME` variable
   - Configurable versions (MySQL, WordPress, etc.)
@@ -87,32 +77,19 @@ Your WordPress Docker setup has been transformed into a **production-ready, reus
   - Volume management
   - Security labels and metadata
 
-### 6. **docker-compose.dev.yml** - Development Configuration
-- Simplified setup for local development
-- Direct port mappings (no reverse proxy)
-- No SSL/HTTPS complexity
-- Debug logging enabled
-- Perfect for development and testing
-
 ---
 
 ## ✨ Key Features of Boilerplate
 
 ### 🚀 Deployment Modes
 
-1. **Local Development**
-   - Quick local WordPress setup
-   - No SSL required
-   - Direct port access
-   - Debug logging enabled
-
-2. **Single VPS Instance**
+1. **Single VPS Instance**
    - One WordPress site per VPS
    - Full SSL/HTTPS support
    - NGINX reverse proxy
    - Let's Encrypt automation
 
-3. **Multiple VPS Instances**
+2. **Multiple VPS Instances**
    - Multiple WordPress sites on same VPS
    - Each instance completely isolated
    - Independent databases
@@ -253,18 +230,7 @@ wordpress-vps/
 
 ## 🎯 Common Use Cases
 
-### Use Case 1: Local WordPress Development
-
-```bash
-# Start development environment
-docker compose -f docker-compose.dev.yml up -d
-
-# Access at http://localhost:8001
-# Make changes locally
-# Push to production when ready
-```
-
-### Use Case 2: Single WordPress Site on VPS
+### Use Case 1: Single WordPress Site on VPS
 
 ```bash
 # Copy boilerplate to VPS
@@ -279,7 +245,7 @@ git clone <repo> && cd wordpress-vps
 # Setup WordPress admin account
 ```
 
-### Use Case 3: Multiple Client Websites on VPS
+### Use Case 2: Multiple Client Websites on VPS
 
 ```bash
 # Set up instances directory
@@ -353,14 +319,14 @@ sudo manage-instances.sh restore client1_prod backups/backup.tar.gz
 
 | Metric | Value |
 |--------|-------|
-| Total Files | 19 |
+| Total Files | 15 |
 | Shell Scripts | 3 |
-| Docker Files | 2 |
-| Environment Templates | 4 |
+| Docker Files | 1 |
+| Environment Templates | 2 |
 | Documentation Files | 2 |
-| Lines of Code | ~3000+ |
-| Git Commits | 2 |
-| Deployment Modes | 3 |
+| Lines of Code | ~2500+ |
+| Git Commits | 4 |
+| Deployment Modes | 2 |
 | Supported Instances | Unlimited |
 
 ---
@@ -369,7 +335,6 @@ sudo manage-instances.sh restore client1_prod backups/backup.tar.gz
 
 The boilerplate has been verified to:
 
-- ✅ Support local development with docker-compose.dev.yml
 - ✅ Support single VPS instance with docker-compose.yml
 - ✅ Support multiple instances with manage-instances.sh
 - ✅ Generate secure passwords automatically
@@ -377,7 +342,8 @@ The boilerplate has been verified to:
 - ✅ Provide backup and restore functionality
 - ✅ Include comprehensive documentation
 - ✅ Follow security best practices
-- ✅ Support different environments (dev/staging/prod)
+- ✅ Support production environments
+- ✅ Enable easy scaling
 - ✅ Committed to git with full history
 
 ---

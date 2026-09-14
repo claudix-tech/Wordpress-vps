@@ -59,19 +59,16 @@ The deployment script will:
 
 ```
 wordpress-vps/
-├── docker-compose.yml              # Production Docker Compose config
-├── docker-compose.dev.yml          # Development Docker Compose config
+├── docker-compose.yml              # Production Docker setup
 ├── docker-compose.override.yml.example  # Scaling example
 ├── .env                            # Environment variables (auto-generated)
-├── .env.example                    # Basic template
-├── .env.dev                        # Development template
-├── .env.staging                    # Staging template
-├── .env.production                 # Production template
-├── deploy.sh                       # One-command deployment script
-├── setup.sh                        # Automated setup script
-├── manage-instances.sh             # Multi-instance management tool
+├── .env.example                    # Configuration template
+├── .env.production                 # Production reference
+├── deploy.sh                       # Deployment script
+├── setup.sh                        # Setup helper
+├── manage-instances.sh             # Multi-instance management
 ├── README.md                       # This file
-├── DEPLOYMENT_GUIDE.md             # Comprehensive guide
+├── DEPLOYMENT_GUIDE.md             # Complete guide
 ├── wp-content/                     # WordPress plugins & themes
 ├── certs/                          # SSL certificates
 ├── vhost.d/                        # NGINX configs
@@ -83,30 +80,17 @@ wordpress-vps/
 
 ---
 
-## 🌍 Deployment Modes
+## 🌍 Deployment
 
-### Local Development
+### Single VPS Instance
 
-For local testing with simplified setup:
-
-```bash
-docker compose -f docker-compose.dev.yml up -d
-# Access at http://localhost:8001
-```
-
-Use `.env.dev` - No SSL, direct port access, debug logging enabled
-
-### VPS - Single Instance
-
-Deploy one WordPress site on a VPS:
+Deploy one WordPress site:
 
 ```bash
 ./deploy.sh
 ```
 
-Use `.env` or `.env.production` - Full SSL, NGINX proxy, Let's Encrypt
-
-### VPS - Multiple Instances
+### Multiple VPS Instances
 
 Manage multiple WordPress sites on same VPS:
 
@@ -115,45 +99,11 @@ sudo manage-instances.sh create wordpress_prod_01 blog1.com admin@blog1.com
 sudo manage-instances.sh create wordpress_prod_02 blog2.com admin@blog2.com
 ```
 
-Each instance is isolated with its own database, files, config, and SSL certificate.
+Each instance is completely isolated with its own database, files, config, and SSL certificate.
 
 ---
 
-## 🛠️ Environment Templates
-
-### Development (`.env.dev`)
-
-```bash
-cp .env.dev .env
-docker compose -f docker-compose.dev.yml up -d
-```
-
-**Features:** No SSL, direct port (8001), debug enabled, minimal security
-
-### Staging (`.env.staging`)
-
-```bash
-cp .env.staging .env
-./deploy.sh
-```
-
-**Features:** SSL/HTTPS, NGINX proxy, full logging, pre-production ready
-
-### Production (`.env.production`)
-
-```bash
-cp .env.production .env
-# Edit with real domain and passwords
-./deploy.sh
-```
-
-**Features:** SSL/HTTPS, NGINX proxy, no debug, production-hardened
-
----
-
-## 📋 Configuration
-
-### Environment Variables (`.env`)
+## 🛠️ Configuration
 
 All credentials are in `.env` (excluded from git for security):
 
