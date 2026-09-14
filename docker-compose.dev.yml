@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  # MySQL Database Service
+  db:
+    image: mysql:latest
+    container_name: wordpress_db_dev
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-wordpress_db}
+      MYSQL_USER: ${MYSQL_USER:-wordpress_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-wordpress_pass}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - wordpress_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # WordPress Application Service
+  wordpress:
+    depends_on:
+      db:
+        condition: service_healthy
+    image: wordpress:latest
+    container_name: wordpress_app_dev
+    restart: always
+    ports:
+      - "8001:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: ${MYSQL_USER:-wordpress_user}
+      WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD:-wordpress_pass}
+      WORDPRESS_DB_NAME: ${MYSQL_DATABASE:-wordpress_db}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
+    volumes:
+      - ./wp-content:/var/www/html/wp-content
+    networks:
+      - wordpress_network
+
+  # PHPMyAdmin Service
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: wordpress_phpmyadmin_dev
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_USER: ${MYSQL_USER:-wordpress_user}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-wordpress_pass}
+    networks:
+      - wordpress_network
+    depends_on:
+      - db
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  wordpress_network:
+    driver: bridge

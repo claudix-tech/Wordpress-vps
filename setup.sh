@@ -35,11 +35,11 @@ fi
 echo "✓ Docker found: $(docker --version)"
 
 # Check Docker Compose installation
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Docker Compose is not installed. Please install Docker Compose first."
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker is not installed. Please install Docker first."
     exit 1
 fi
-echo "✓ Docker Compose found: $(docker-compose --version)"
+echo "✓ Docker found: $(docker --version)"
 
 # Verify .env configuration
 echo ""
@@ -59,12 +59,12 @@ fi
 # Pull and build images
 echo ""
 echo "Pulling Docker images (this may take several minutes)..."
-docker-compose pull
+docker compose pull
 
 # Start containers
 echo ""
 echo "Starting Docker containers..."
-docker-compose up -d
+docker compose up -d
 
 # Wait for services to be ready
 echo ""
@@ -74,7 +74,7 @@ sleep 10
 # Check container status
 echo ""
 echo "Container Status:"
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "=========================================="
@@ -87,8 +87,8 @@ echo "2. Access WordPress: https://\$(grep DOMAIN_NAME .env | cut -d '=' -f2)"
 echo "3. PHPMyAdmin: http://\$(grep DOMAIN_NAME .env | cut -d '=' -f2):8080"
 echo ""
 echo "View logs:"
-echo "  docker-compose logs -f"
+echo "  docker compose logs -f"
 echo ""
 echo "Stop containers:"
-echo "  docker-compose down"
+echo "  docker compose down"
 echo ""
