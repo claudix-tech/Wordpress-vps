@@ -13,9 +13,13 @@ import argparse
 import shutil
 import secrets
 import string
+import socket
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Tuple
+
+# Global Docker Compose command (set by main())
+COMPOSE_CMD: Optional[str] = None
 
 # Colors for terminal output
 class Colors:
@@ -51,6 +55,27 @@ def print_header(title: str):
     print(f"{Colors.BLUE}{title:^50}{Colors.ENDC}")
     print(f"{Colors.BLUE}{'='*50}{Colors.ENDC}\n")
 
+def get_compose_cmd() -> Optional[str]:
+    """Detect which Docker Compose command is available (new or old format)"""
+    # Try new format first (docker compose)
+    try:
+        result = subprocess.run(
+            ['docker', 'compose', 'version'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return 'docker compose'
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    
+    # Try old format (docker-compose)
+    if shutil.which('docker-compose'):
+        return 'docker-compose'
+    
+    return None
+
 def check_dependencies():
     """Check if Docker and Docker Compose are installed"""
     if not shutil.which('docker'):
@@ -58,12 +83,15 @@ def check_dependencies():
         log_info("Install from: https://docs.docker.com/install/")
         sys.exit(1)
     
-    if not shutil.which('docker-compose'):
-        log_error("Docker Compose is not installed")
-        log_info("Install from: https://docs.docker.com/compose/install/")
+    compose_cmd = get_compose_cmd()
+    if not compose_cmd:
+        log_error("Docker Compose is not installed or not recognized")
+        log_info("Install Docker Desktop (includes 'docker compose') or Docker Compose standalone")
+        log_info("See: https://docs.docker.com/compose/install/")
         sys.exit(1)
     
-    log_info("Docker and Docker Compose are installed")
+    log_info(f"Using Docker Compose: {compose_cmd}")
+    return compose_cmd
 
 def generate_password(length: int = 25) -> str:
     """Generate a secure random password"""
@@ -82,18 +110,20 @@ def find_available_port(start_port: int = 8000) -> int:
     port = start_port
     while True:
         try:
-            result = subprocess.run(
-                ['netstat', '-tuln'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if f":{port} " not in result.stdout:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', port))
                 return port
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            # If netstat not available, just return the port
-            return port
-        port += 1
+        except OSError:
+            port += 1
+
+def is_port_in_use(port: int) -> bool:
+    """Check if a port is currently in use"""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', port))
+            return False
+    except OSError:
+        return True
 
 def create_instance(instance_name: str, wp_port: Optional[int] = None, pma_port: Optional[int] = None) -> bool:
     """Create a new WordPress instance"""
@@ -115,6 +145,50 @@ def create_instance(instance_name: str, wp_port: Optional[int] = None, pma_port:
         log_error(f"Instance '{instance_name}' already exists")
         return False
     
+    # Prompt for ports if not provided
+    if wp_port is None:
+        default_wp = find_available_port(8000)
+        if sys.stdin.isatty():
+            try:
+                val = input(f"Enter WordPress port [default: {default_wp}]: ").strip()
+                wp_port = int(val) if val else default_wp
+            except ValueError:
+                log_warn(f"Invalid input, using default port: {default_wp}")
+                wp_port = default_wp
+        else:
+            wp_port = default_wp
+
+    if pma_port is None:
+        default_pma = find_available_port(wp_port + 1)
+        if sys.stdin.isatty():
+            try:
+                val = input(f"Enter phpMyAdmin port [default: {default_pma}]: ").strip()
+                pma_port = int(val) if val else default_pma
+            except ValueError:
+                log_warn(f"Invalid input, using default port: {default_pma}")
+                pma_port = default_pma
+        else:
+            pma_port = default_pma
+
+    # Check if ports are already in use
+    if is_port_in_use(wp_port):
+        log_warn(f"Port {wp_port} is already in use by another service!")
+        if sys.stdin.isatty():
+            confirm = input(f"Continue with port {wp_port} anyway? (y/N): ").strip()
+            if confirm.lower() != 'y':
+                log_info("Creation cancelled")
+                return False
+
+    if is_port_in_use(pma_port):
+        log_warn(f"Port {pma_port} is already in use by another service!")
+        if sys.stdin.isatty():
+            confirm = input(f"Continue with port {pma_port} anyway? (y/N): ").strip()
+            if confirm.lower() != 'y':
+                log_info("Creation cancelled")
+                return False
+
+    log_info(f"Using ports: WordPress={wp_port}, phpMyAdmin={pma_port}")
+
     # Create directories
     log_info("Creating instance directory structure...")
     instance_dir.mkdir(parents=True, exist_ok=True)
@@ -122,12 +196,6 @@ def create_instance(instance_name: str, wp_port: Optional[int] = None, pma_port:
     (instance_dir / 'wp-content' / 'plugins').mkdir(parents=True, exist_ok=True)
     (instance_dir / 'wp-content' / 'themes').mkdir(parents=True, exist_ok=True)
     (instance_dir / 'backups').mkdir(parents=True, exist_ok=True)
-    
-    # Auto-detect ports if not provided
-    if wp_port is None:
-        wp_port = find_available_port(8000)
-    if pma_port is None:
-        pma_port = find_available_port(wp_port + 1)
     
     # Generate passwords
     log_info("Generating secure passwords...")
@@ -248,7 +316,7 @@ def start_instance(instance_name: str) -> bool:
     
     log_info("Starting Docker containers...")
     result = subprocess.run(
-        ['docker-compose', 'up', '-d'],
+        COMPOSE_CMD.split() + ['up', '-d'],
         cwd=instance_dir
     )
     
@@ -289,7 +357,7 @@ def stop_instance(instance_name: str) -> bool:
     print_header(f"Stopping WordPress Instance: {instance_name}")
     
     result = subprocess.run(
-        ['docker-compose', 'down'],
+        COMPOSE_CMD.split() + ['down'],
         cwd=instance_dir
     )
     
@@ -389,7 +457,7 @@ def backup_instance(instance_name: str) -> bool:
     db_backup_file = backup_dir / f"db-backup-{timestamp}.sql"
     
     result = subprocess.run(
-        f'docker exec {db_container} mysqldump -u {db_user} -p{db_password} {db_name} > {db_backup_file}',
+        f'docker exec {db_container} mysqldump --no-tablespaces -u {db_user} -p{db_password} {db_name} > {db_backup_file}',
         shell=True,
         cwd=instance_dir
     )
@@ -440,7 +508,7 @@ def delete_instance(instance_name: str) -> bool:
     
     log_info("Stopping containers...")
     subprocess.run(
-        ['docker-compose', 'down', '-v'],
+        COMPOSE_CMD.split() + ['down', '-v'],
         cwd=instance_dir,
         capture_output=True
     )
@@ -454,7 +522,8 @@ def delete_instance(instance_name: str) -> bool:
 def main():
     """Main entry point"""
     
-    check_dependencies()
+    global COMPOSE_CMD
+    COMPOSE_CMD = check_dependencies()
     
     parser = argparse.ArgumentParser(
         description='WordPress Docker Instance Manager',
@@ -476,8 +545,10 @@ Examples:
     # Create command
     create_parser = subparsers.add_parser('create', help='Create a new WordPress instance')
     create_parser.add_argument('name', help='Instance name')
-    create_parser.add_argument('--wp-port', type=int, help='WordPress port (auto-detected if not specified)')
-    create_parser.add_argument('--pma-port', type=int, help='phpMyAdmin port (auto-detected if not specified)')
+    create_parser.add_argument('pos_wp_port', nargs='?', type=int, default=None, help='WordPress port (positional)')
+    create_parser.add_argument('pos_pma_port', nargs='?', type=int, default=None, help='phpMyAdmin port (positional)')
+    create_parser.add_argument('--wp-port', dest='opt_wp_port', type=int, help='WordPress port (flag)')
+    create_parser.add_argument('--pma-port', dest='opt_pma_port', type=int, help='phpMyAdmin port (flag)')
     
     # Start command
     start_parser = subparsers.add_parser('start', help='Start an instance')
@@ -505,7 +576,9 @@ Examples:
         return
     
     if args.command == 'create':
-        success = create_instance(args.name, args.wp_port, args.pma_port)
+        wp_port = args.opt_wp_port if args.opt_wp_port is not None else args.pos_wp_port
+        pma_port = args.opt_pma_port if args.opt_pma_port is not None else args.pos_pma_port
+        success = create_instance(args.name, wp_port, pma_port)
     elif args.command == 'start':
         success = start_instance(args.name)
     elif args.command == 'stop':

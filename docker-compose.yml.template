@@ -22,7 +22,7 @@ services:
 
   # WordPress Service
   wordpress_{{INSTANCE_NAME}}:
-    image: wordpress:latest-php8.2-apache
+    image: wordpress:latest
     container_name: wp-app-{{INSTANCE_NAME}}
     restart: always
     depends_on:
@@ -41,7 +41,6 @@ services:
         define('WP_MAX_MEMORY_LIMIT', '512M');
     volumes:
       - ./wp-content:/var/www/html/wp-content
-      - ./wp-config-extra.php:/usr/local/etc/php/conf.d/wordpress.ini
     networks:
       - wordpress_network_{{INSTANCE_NAME}}
     labels:

@@ -3,15 +3,8 @@
 .env.local
 .env.*.local
 
-# Docker volumes and data
-instances/*/data/
-instances/*/.volumes/
-instances/*/mysql/
-
-# WordPress content
-instances/*/wp-content/uploads/
-instances/*/wp-content/plugins/
-instances/*/wp-content/themes/
+# WordPress instances (deployed instances are isolated and untracked in manager repo)
+instances/
 
 # Backups
 backups/

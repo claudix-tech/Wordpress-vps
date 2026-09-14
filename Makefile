@@ -2,6 +2,7 @@
 
 PYTHON := python3
 WP_MANAGER := $(PYTHON) wp-manager.py
+COMPOSE := $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 
 # Default instance name for testing
 INSTANCE ?= test-site
@@ -52,7 +53,7 @@ delete:
 
 logs:
 	@if [ -d "instances/$(INSTANCE)" ]; then \
-		cd instances/$(INSTANCE) && docker-compose logs -f; \
+		cd instances/$(INSTANCE) && $(COMPOSE) logs -f; \
 	else \
 		echo "Instance $(INSTANCE) not found"; \
 	fi
@@ -68,17 +69,17 @@ shell-db:
 	fi
 
 ps:
-	@docker-compose -f instances/$(INSTANCE)/docker-compose.yml ps
+	@$(COMPOSE) -f instances/$(INSTANCE)/docker-compose.yml ps
 
 stats:
-	@docker-compose -f instances/$(INSTANCE)/docker-compose.yml stats
+	@$(COMPOSE) -f instances/$(INSTANCE)/docker-compose.yml stats
 
 test:
 	@echo "Running tests..."
 	@echo "1. Checking Docker installation..."
 	@docker --version
 	@echo "2. Checking Docker Compose installation..."
-	@docker-compose --version
+	@$(COMPOSE) version
 	@echo "3. Testing Python script..."
 	@$(WP_MANAGER) --help
 	@echo "All tests passed!"

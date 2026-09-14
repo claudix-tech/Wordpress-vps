@@ -74,6 +74,22 @@ validate_instance_name() {
 }
 
 ################################################################################
+# Detect Docker Compose Command
+################################################################################
+
+get_compose_cmd() {
+    # Try new format first (docker compose)
+    if command -v docker &> /dev/null && docker compose version &> /dev/null 2>&1; then
+        echo "docker compose"
+    # Fall back to old format (docker-compose)
+    elif command -v docker-compose &> /dev/null; then
+        echo "docker-compose"
+    else
+        echo ""
+    fi
+}
+
+################################################################################
 # Find Available Port
 ################################################################################
 
@@ -81,11 +97,20 @@ find_available_port() {
     local start_port=$1
     local port=$start_port
     
-    while netstat -tuln 2>/dev/null | grep -q ":$port "; do
+    while ! python3 -c "import socket; s = socket.socket(); s.bind(('', $port)); s.close()" 2>/dev/null; do
         port=$((port + 1))
     done
     
     echo $port
+}
+
+is_port_in_use() {
+    local port=$1
+    if python3 -c "import socket; s = socket.socket(); s.bind(('', $port)); s.close()" 2>/dev/null; then
+        return 1 # free
+    else
+        return 0 # in use
+    fi
 }
 
 ################################################################################
@@ -103,6 +128,52 @@ create_instance() {
     if ! validate_instance_name "$instance_name"; then
         return 1
     fi
+    
+    # Prompt for ports if not provided
+    if [ -z "$wp_port" ]; then
+        local default_wp=$(find_available_port 8000)
+        if [ -t 0 ]; then
+            read -p "Enter WordPress port [default: $default_wp]: " input_wp
+            wp_port=${input_wp:-$default_wp}
+        else
+            wp_port=$default_wp
+        fi
+    fi
+
+    if [ -z "$pma_port" ]; then
+        local default_pma=$(find_available_port $((wp_port + 1)))
+        if [ -t 0 ]; then
+            read -p "Enter phpMyAdmin port [default: $default_pma]: " input_pma
+            pma_port=${input_pma:-$default_pma}
+        else
+            pma_port=$default_pma
+        fi
+    fi
+
+    # Check if ports are in use
+    if is_port_in_use "$wp_port"; then
+        log_warn "Port $wp_port is already in use by another service!"
+        if [ -t 0 ]; then
+            read -p "Continue with port $wp_port anyway? (y/N): " confirm_wp
+            if [[ ! $confirm_wp =~ ^[Yy]$ ]]; then
+                log_info "Creation cancelled"
+                return 1
+            fi
+        fi
+    fi
+
+    if is_port_in_use "$pma_port"; then
+        log_warn "Port $pma_port is already in use by another service!"
+        if [ -t 0 ]; then
+            read -p "Continue with port $pma_port anyway? (y/N): " confirm_pma
+            if [[ ! $confirm_pma =~ ^[Yy]$ ]]; then
+                log_info "Creation cancelled"
+                return 1
+            fi
+        fi
+    fi
+    
+    log_info "Using ports: WordPress=$wp_port, phpMyAdmin=$pma_port"
     
     # Create instance directory
     local instance_dir="$SCRIPT_DIR/instances/$instance_name"
@@ -303,7 +374,8 @@ start_instance() {
     cd "$instance_dir"
     
     log_info "Starting Docker containers..."
-    docker-compose up -d
+    cd "$instance_dir"
+    $COMPOSE_CMD up -d
     
     if [ $? -eq 0 ]; then
         # Extract port from .env
@@ -341,7 +413,7 @@ stop_instance() {
     print_header "Stopping WordPress Instance: $instance_name"
     
     cd "$instance_dir"
-    docker-compose down
+    $COMPOSE_CMD down
     
     log_success "Instance stopped"
     return 0
@@ -417,7 +489,7 @@ delete_instance() {
     cd "$instance_dir"
     
     log_info "Stopping containers..."
-    docker-compose down -v 2>/dev/null || true
+    $COMPOSE_CMD down -v 2>/dev/null || true
     
     log_info "Removing instance directory..."
     cd "$SCRIPT_DIR"
@@ -454,9 +526,10 @@ backup_instance() {
     local db_container="wp-db-$instance_name"
     
     log_info "Backing up database..."
-    docker exec $db_container mysqldump -u $db_user -p$db_password $db_name > "$backup_dir/db-backup-$timestamp.sql"
+    $COMPOSE_CMD exec -T $db_container mysqldump --no-tablespaces -u $db_user -p$db_password $db_name > "$backup_dir/db-backup-$timestamp.sql"
     
     log_info "Backing up WordPress files..."
+    cd "$instance_dir"
     tar -czf "$backup_dir/files-backup-$timestamp.tar.gz" wp-content/
     
     log_success "Backup completed"
@@ -496,12 +569,16 @@ main() {
         exit 1
     fi
     
-    # Check if docker-compose is installed
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose is not installed"
-        log_info "Please install Docker Compose first: https://docs.docker.com/compose/install/"
+    # Detect Docker Compose command (supports both new and old format)
+    COMPOSE_CMD=$(get_compose_cmd)
+    if [ -z "$COMPOSE_CMD" ]; then
+        log_error "Docker Compose is not installed or not recognized"
+        log_info "Install Docker Desktop (includes 'docker compose') or Docker Compose standalone"
+        log_info "See: https://docs.docker.com/compose/install/"
         exit 1
     fi
+    
+    log_info "Using Docker Compose: $COMPOSE_CMD"
     
     # If no arguments provided, show interactive menu
     if [ $# -eq 0 ]; then
@@ -512,12 +589,18 @@ main() {
             case $choice in
                 1)
                     read -p "Enter instance name: " instance_name
+                    if [ -z "$instance_name" ]; then
+                        log_error "Instance name cannot be empty"
+                        continue
+                    fi
                     
-                    # Auto-find ports
-                    local wp_port=$(find_available_port 8000)
-                    local pma_port=$(find_available_port $((wp_port + 1)))
+                    local default_wp=$(find_available_port 8000)
+                    read -p "Enter WordPress port [default: $default_wp]: " input_wp
+                    local wp_port=${input_wp:-$default_wp}
                     
-                    log_info "Detected available ports: WordPress=$wp_port, phpMyAdmin=$pma_port"
+                    local default_pma=$(find_available_port $((wp_port + 1)))
+                    read -p "Enter phpMyAdmin port [default: $default_pma]: " input_pma
+                    local pma_port=${input_pma:-$default_pma}
                     
                     create_instance "$instance_name" "$wp_port" "$pma_port"
                     ;;
@@ -560,8 +643,8 @@ main() {
                     exit 1
                 fi
                 local instance_name=$2
-                local wp_port=${3:-8000}
-                local pma_port=${4:-8080}
+                local wp_port=$3
+                local pma_port=$4
                 create_instance "$instance_name" "$wp_port" "$pma_port"
                 ;;
             start)
