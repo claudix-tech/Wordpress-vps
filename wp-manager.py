@@ -242,6 +242,35 @@ INSTANCE_EMAIL=admin@{instance_name}.local
     compose_file = instance_dir / 'docker-compose.yml'
     compose_file.write_text(compose_content)
     
+    # Create uploads.ini for PHP upload size limit
+    log_info("Creating PHP upload configuration (uploads.ini)...")
+    uploads_template_file = script_dir / 'uploads.ini.template'
+    if uploads_template_file.exists():
+        uploads_ini_content = uploads_template_file.read_text()
+    else:
+        uploads_ini_content = """; PHP Upload & Resource Limits (5GB)
+file_uploads = On
+memory_limit = 1024M
+upload_max_filesize = 5120M
+post_max_size = 5120M
+max_execution_time = 3600
+max_input_time = 3600
+max_file_uploads = 50
+"""
+    (instance_dir / 'uploads.ini').write_text(uploads_ini_content)
+
+    # Create apache-limits.conf for Apache 5GB upload limit
+    log_info("Creating Apache upload configuration (apache-limits.conf)...")
+    apache_template_file = script_dir / 'apache-limits.conf.template'
+    if apache_template_file.exists():
+        apache_conf_content = apache_template_file.read_text()
+    else:
+        apache_conf_content = """# Apache limits for large file uploads (up to 5GB)
+LimitRequestBody 0
+Timeout 3600
+"""
+    (instance_dir / 'apache-limits.conf').write_text(apache_conf_content)
+    
     # Create .dockerignore
     dockerignore_content = """
 .git

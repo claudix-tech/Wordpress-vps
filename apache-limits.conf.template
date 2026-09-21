@@ -1,0 +1,4 @@
+# Apache limits for large file uploads (up to 5GB)
+LimitRequestBody 0
+Timeout 3600
+

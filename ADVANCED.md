@@ -43,6 +43,44 @@ environment:
     define('WP_AUTO_UPDATE_CORE', true);
 ```
 
+### Upload & Resource Limits (5GB)
+
+Each instance is pre-configured to support uploads up to **5GB** (ideal for large migrations with All-in-One WP Migration, video files, and backups):
+
+1. **PHP Configuration (`instances/{name}/uploads.ini`)**:
+   Mounted to `/usr/local/etc/php/conf.d/uploads.ini`:
+   ```ini
+   file_uploads = On
+   memory_limit = 1024M
+   upload_max_filesize = 5120M
+   post_max_size = 5120M
+   max_execution_time = 3600
+   max_input_time = 3600
+   max_file_uploads = 50
+   ```
+
+2. **Apache Configuration (`instances/{name}/apache-limits.conf`)**:
+   Mounted to `/etc/apache2/conf-enabled/limits.conf`:
+   ```apache
+   LimitRequestBody 0
+   Timeout 3600
+   ```
+
+3. **Reverse Proxy Configuration (if using NGINX)**:
+   If using an NGINX reverse proxy in front of WordPress, ensure `client_max_body_size` is set:
+   ```nginx
+   client_max_body_size 5G;
+   proxy_connect_timeout 3600s;
+   proxy_send_timeout 3600s;
+   proxy_read_timeout 3600s;
+   ```
+
+To modify these values for an instance, edit `instances/{name}/uploads.ini` or `instances/{name}/apache-limits.conf` and reload:
+```bash
+cd instances/{name}
+docker compose restart
+```
+
 ## Performance Optimization
 
 ### Database Optimization

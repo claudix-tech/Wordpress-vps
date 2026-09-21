@@ -37,10 +37,16 @@ services:
       WORDPRESS_DB_PASSWORD: ${MYSQL_PASSWORD}
       WORDPRESS_TABLE_PREFIX: ${WP_TABLE_PREFIX}
       WORDPRESS_CONFIG_EXTRA: |
-        define('WP_MEMORY_LIMIT', '256M');
-        define('WP_MAX_MEMORY_LIMIT', '512M');
+        define('WP_MEMORY_LIMIT', '1024M');
+        define('WP_MAX_MEMORY_LIMIT', '2048M');
+        @ini_set('upload_max_filesize', '5120M');
+        @ini_set('post_max_size', '5120M');
+        @ini_set('max_execution_time', '3600');
+        @ini_set('max_input_time', '3600');
     volumes:
       - ./wp-content:/var/www/html/wp-content
+      - ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+      - ./apache-limits.conf:/etc/apache2/conf-enabled/limits.conf
     networks:
       - wordpress_network_{{INSTANCE_NAME}}
     labels:
@@ -60,6 +66,8 @@ services:
       PMA_USER: ${MYSQL_USER}
       PMA_PASSWORD: ${MYSQL_PASSWORD}
       PMA_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      UPLOAD_LIMIT: 5120M
+      MEMORY_LIMIT: 1024M
     networks:
       - wordpress_network_{{INSTANCE_NAME}}
     labels:

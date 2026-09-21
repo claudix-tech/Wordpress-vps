@@ -15,12 +15,16 @@ Wordpress-vps/
 ├── wp-manager.py                  # Python management tool (recommended)
 ├── wp-manager.sh                  # Bash management tool (alternative)
 ├── docker-compose.yml.template    # Template for instance configurations
+├── uploads.ini.template           # Template for PHP upload limits (5GB)
+├── apache-limits.conf.template    # Template for Apache upload limits (5GB)
 ├── .env.template                  # Template for environment variables
 ├── .gitignore                     # Ignore sensitive files in git
 └── instances/                     # (created when you make your first instance)
     └── {instance-name}/
         ├── .env                   # Instance secrets (not tracked)
         ├── docker-compose.yml     # Instance Docker config
+        ├── uploads.ini            # PHP upload limits (5GB)
+        ├── apache-limits.conf     # Apache upload limits (5GB)
         ├── README.md              # Instance-specific docs
         ├── .dockerignore          # Docker build excludes
         ├── wp-content/

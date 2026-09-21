@@ -1,0 +1,11 @@
+; PHP Upload & Resource Limits (5GB)
+; Based on ServMask All-in-One WP Migration recommendations:
+; https://help.servmask.com/2018/10/27/how-to-increase-maximum-upload-file-size-in-wordpress/
+
+file_uploads = On
+memory_limit = 1024M
+upload_max_filesize = 5120M
+post_max_size = 5120M
+max_execution_time = 3600
+max_input_time = 3600
+max_file_uploads = 50

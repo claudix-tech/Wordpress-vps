@@ -225,6 +225,35 @@ EOF
     log_info "Creating docker-compose configuration..."
     sed "s/{{INSTANCE_NAME}}/$instance_name/g" "$SCRIPT_DIR/docker-compose.yml.template" > "$instance_dir/docker-compose.yml"
     
+    # Create uploads.ini for PHP upload size limit
+    log_info "Creating PHP upload configuration (uploads.ini)..."
+    if [ -f "$SCRIPT_DIR/uploads.ini.template" ]; then
+        cp "$SCRIPT_DIR/uploads.ini.template" "$instance_dir/uploads.ini"
+    else
+        cat > "$instance_dir/uploads.ini" << EOF
+; PHP Upload & Resource Limits (5GB)
+file_uploads = On
+memory_limit = 1024M
+upload_max_filesize = 5120M
+post_max_size = 5120M
+max_execution_time = 3600
+max_input_time = 3600
+max_file_uploads = 50
+EOF
+    fi
+
+    # Create apache-limits.conf for Apache 5GB upload limit
+    log_info "Creating Apache upload configuration (apache-limits.conf)..."
+    if [ -f "$SCRIPT_DIR/apache-limits.conf.template" ]; then
+        cp "$SCRIPT_DIR/apache-limits.conf.template" "$instance_dir/apache-limits.conf"
+    else
+        cat > "$instance_dir/apache-limits.conf" << EOF
+# Apache limits for large file uploads (up to 5GB)
+LimitRequestBody 0
+Timeout 3600
+EOF
+    fi
+    
     # Create .dockerignore
     cat > "$instance_dir/.dockerignore" << EOF
 .git
@@ -459,6 +488,56 @@ list_instances() {
 }
 
 ################################################################################
+# Select Instance (interactive menu helper)
+################################################################################
+
+select_instance() {
+    local instances_dir="$SCRIPT_DIR/instances"
+
+    if [ ! -d "$instances_dir" ] || [ -z "$(ls -A "$instances_dir" 2>/dev/null)" ]; then
+        log_warn "No instances found" >&2
+        return 1
+    fi
+
+    local names=()
+    for instance_dir in "$instances_dir"/*; do
+        [ -d "$instance_dir" ] && names+=("$(basename "$instance_dir")")
+    done
+
+    if [ ${#names[@]} -eq 0 ]; then
+        log_warn "No instances found" >&2
+        return 1
+    fi
+
+    local running_labels
+    running_labels=$(docker ps --format "{{.Labels}}")
+
+    echo "" >&2
+    echo -e "${BLUE}Available instances:${NC}" >&2
+    local i=1 name status
+    for name in "${names[@]}"; do
+        if echo "$running_labels" | grep -q "com.wordpress.instance=$name"; then
+            status="${GREEN}RUNNING${NC}"
+        else
+            status="${RED}STOPPED${NC}"
+        fi
+        echo -e "  $i) $name [$status]" >&2
+        i=$((i + 1))
+    done
+    echo "" >&2
+
+    local choice
+    read -p "Select instance number: " choice
+
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt ${#names[@]} ]; then
+        log_error "Invalid selection" >&2
+        return 1
+    fi
+
+    echo "${names[$((choice - 1))]}"
+}
+
+################################################################################
 # Delete Instance
 ################################################################################
 
@@ -605,22 +684,22 @@ main() {
                     create_instance "$instance_name" "$wp_port" "$pma_port"
                     ;;
                 2)
-                    read -p "Enter instance name: " instance_name
+                    instance_name=$(select_instance) || continue
                     start_instance "$instance_name"
                     ;;
                 3)
-                    read -p "Enter instance name: " instance_name
+                    instance_name=$(select_instance) || continue
                     stop_instance "$instance_name"
                     ;;
                 4)
                     list_instances
                     ;;
                 5)
-                    read -p "Enter instance name: " instance_name
+                    instance_name=$(select_instance) || continue
                     backup_instance "$instance_name"
                     ;;
                 6)
-                    read -p "Enter instance name: " instance_name
+                    instance_name=$(select_instance) || continue
                     delete_instance "$instance_name"
                     ;;
                 7)

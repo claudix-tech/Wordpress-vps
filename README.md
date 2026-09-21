@@ -185,7 +185,8 @@ instances/
 └── mysite/
     ├── .env                          # Instance configuration (DO NOT COMMIT)
     ├── docker-compose.yml            # Docker services definition
-    ├── README.md                      # Instance-specific documentation
+    ├── uploads.ini                   # PHP upload limits (512M)
+    ├── README.md                     # Instance-specific documentation
     ├── .dockerignore                 # Docker build ignore file
     ├── wp-content/
     │   ├── uploads/                  # User uploaded files
@@ -193,7 +194,7 @@ instances/
     │   └── themes/                   # WordPress themes
     └── backups/
         ├── db-backup-*.sql           # Database backups
-        └── files-backup-*.tar.gz      # File archives
+        └── files-backup-*.tar.gz     # File archives
 ```
 
 ## Environment Configuration
@@ -395,6 +396,23 @@ See [PERFORMANCE.md](PERFORMANCE.md) for:
 - Database optimization
 - CDN integration
 - Memory and CPU allocation
+
+### Increased Upload File Size (5GB)
+
+By default, each instance comes pre-configured with a **5GB** upload file size limit (ideal for large migrations with All-in-One WP Migration, video files, and backups):
+- `upload_max_filesize = 5120M` (5GB)
+- `post_max_size = 5120M` (5GB)
+- `memory_limit = 1024M` (1GB)
+- `max_execution_time = 3600` (1 hour)
+- `max_input_time = 3600` (1 hour)
+- Apache `LimitRequestBody 0` (unlimited payload)
+- phpMyAdmin `UPLOAD_LIMIT = 5120M`
+
+To adjust these limits for an instance, edit `instances/{name}/uploads.ini` or `instances/{name}/apache-limits.conf` and restart:
+```bash
+cd instances/{name}
+docker compose restart
+```
 
 ### Custom WordPress Plugins
 
