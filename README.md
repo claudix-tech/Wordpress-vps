@@ -75,8 +75,12 @@ cd ~/Documents/work/clients/Rych/Wordpress-vps
 
 **Command Line Mode:**
 ```bash
-# Syntax: ./wp-manager.sh create <instance_name> [wp_port] [pma_port]
+# Syntax: ./wp-manager.sh create <instance_name> [wp_port] [pma_port] [php_version]
 ./wp-manager.sh create mysite 8080 8081
+
+# With a specific PHP version (8.2 or 8.3, default: 8.2)
+./wp-manager.sh create mysite 8080 8081 8.3
+python3 wp-manager.py create mysite 8080 8081 --php-version 8.3
 ```
 
 This will:
@@ -119,7 +123,8 @@ Shows numbered menu options:
 4. List instances
 5. Backup instance
 6. Delete instance
-7. Exit
+7. Fix upload permissions
+8. Exit
 
 ### Command-Line Interface
 
@@ -212,6 +217,7 @@ MYSQL_PASSWORD=...                   # Database user password
 WP_TABLE_PREFIX=wp_                  # WordPress table prefix
 WP_PORT=8080                         # WordPress access port
 PMA_PORT=8081                        # phpMyAdmin access port
+PHP_VERSION=8.2                      # PHP version (8.2 or 8.3), chosen at creation
 
 # Instance Metadata
 INSTANCE_NAME=mysite
@@ -238,10 +244,10 @@ INSTANCE_EMAIL=admin@mysite.local
 
 ### WordPress Container
 - **Name**: `wp-app-{instance_name}`
-- **Image**: `wordpress:latest-php8.2-apache`
+- **Image**: `wordpress:php{version}-apache`, where `{version}` is chosen per-instance at creation time (currently `8.2` or `8.3`, default `8.2`)
 - **Port**: Configurable (default 8080)
 - **Volumes**: wp-content directory
-- **Features**: Apache2, PHP 8.2, WordPress CLI ready
+- **Features**: Apache2, WordPress CLI ready
 
 ### phpMyAdmin Container
 - **Name**: `wp-pma-{instance_name}`
@@ -341,6 +347,18 @@ docker-compose logs wp-app-mysite
 # Check Apache configuration
 docker exec wp-app-mysite apache2ctl status
 ```
+
+### "... is not writable by the server" / Upload Errors
+
+WordPress (running as `www-data` inside the container) can't write to `wp-content/uploads` — usually because files there ended up owned by someone else, e.g. after running an import/migration via `docker exec` (root by default) or copying files in from the host manually.
+
+```bash
+python3 wp-manager.py fix-permissions mysite
+# or
+./wp-manager.sh fix-permissions mysite
+```
+
+This resets `wp-content` (and everything under it) to `www-data:www-data` ownership with `755` permissions inside the running container. The instance must be running first (`start` it if needed).
 
 ### Port Already in Use
 

@@ -23,6 +23,10 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Supported PHP versions for the WordPress image (wordpress:php{VERSION}-apache)
+SUPPORTED_PHP_VERSIONS=("8.2" "8.3")
+DEFAULT_PHP_VERSION="${SUPPORTED_PHP_VERSIONS[0]}"
+
 ################################################################################
 # Helper Functions
 ################################################################################
@@ -114,6 +118,57 @@ is_port_in_use() {
 }
 
 ################################################################################
+# Resolve PHP Version
+################################################################################
+
+resolve_php_version() {
+    local input_version=$1
+
+    if [ -z "$input_version" ]; then
+        if [ -t 0 ]; then
+            echo "" >&2
+            echo -e "${BLUE}Available PHP versions:${NC}" >&2
+            local i=1 v
+            for v in "${SUPPORTED_PHP_VERSIONS[@]}"; do
+                echo "  $i) PHP $v" >&2
+                i=$((i + 1))
+            done
+            read -p "Select PHP version [default: PHP $DEFAULT_PHP_VERSION]: " choice
+            if [ -z "$choice" ]; then
+                echo "$DEFAULT_PHP_VERSION"
+                return 0
+            elif [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#SUPPORTED_PHP_VERSIONS[@]} ]; then
+                echo "${SUPPORTED_PHP_VERSIONS[$((choice - 1))]}"
+                return 0
+            fi
+            for v in "${SUPPORTED_PHP_VERSIONS[@]}"; do
+                if [ "$v" == "$choice" ]; then
+                    echo "$v"
+                    return 0
+                fi
+            done
+            log_warn "Invalid selection, using default: PHP $DEFAULT_PHP_VERSION" >&2
+            echo "$DEFAULT_PHP_VERSION"
+            return 0
+        else
+            echo "$DEFAULT_PHP_VERSION"
+            return 0
+        fi
+    fi
+
+    local v
+    for v in "${SUPPORTED_PHP_VERSIONS[@]}"; do
+        if [ "$v" == "$input_version" ]; then
+            echo "$input_version"
+            return 0
+        fi
+    done
+
+    log_error "Unsupported PHP version: '$input_version' (supported: ${SUPPORTED_PHP_VERSIONS[*]})" >&2
+    return 1
+}
+
+################################################################################
 # Create Instance
 ################################################################################
 
@@ -121,6 +176,7 @@ create_instance() {
     local instance_name=$1
     local wp_port=$2
     local pma_port=$3
+    local php_version=$4
     
     print_header "Creating WordPress Instance: $instance_name"
     
@@ -174,7 +230,10 @@ create_instance() {
     fi
     
     log_info "Using ports: WordPress=$wp_port, phpMyAdmin=$pma_port"
-    
+
+    php_version=$(resolve_php_version "$php_version") || return 1
+    log_info "Using PHP version: $php_version"
+
     # Create instance directory
     local instance_dir="$SCRIPT_DIR/instances/$instance_name"
     
@@ -214,6 +273,7 @@ MYSQL_PASSWORD=$mysql_password
 WP_TABLE_PREFIX=wp_
 WP_PORT=$wp_port
 PMA_PORT=$pma_port
+PHP_VERSION=$php_version
 
 # Instance Metadata
 INSTANCE_NAME=$instance_name
@@ -223,7 +283,7 @@ EOF
     
     # Create docker-compose.yml
     log_info "Creating docker-compose configuration..."
-    sed "s/{{INSTANCE_NAME}}/$instance_name/g" "$SCRIPT_DIR/docker-compose.yml.template" > "$instance_dir/docker-compose.yml"
+    sed -e "s/{{INSTANCE_NAME}}/$instance_name/g" -e "s/{{PHP_VERSION}}/$php_version/g" "$SCRIPT_DIR/docker-compose.yml.template" > "$instance_dir/docker-compose.yml"
     
     # Create uploads.ini for PHP upload size limit
     log_info "Creating PHP upload configuration (uploads.ini)..."
@@ -275,6 +335,7 @@ EOF
 - **Created**: $(date)
 - **WordPress Port**: $wp_port
 - **phpMyAdmin Port**: $pma_port
+- **PHP Version**: $php_version
 - **Database**: wordpress_${instance_name}
 - **DB User**: wp_${instance_name}
 
@@ -579,6 +640,38 @@ delete_instance() {
 }
 
 ################################################################################
+# Fix Permissions
+################################################################################
+
+fix_permissions() {
+    local instance_name=$1
+    local instance_dir="$SCRIPT_DIR/instances/$instance_name"
+
+    if [ ! -d "$instance_dir" ]; then
+        log_error "Instance '$instance_name' not found"
+        return 1
+    fi
+
+    print_header "Fixing Permissions: $instance_name"
+
+    local container="wp-app-$instance_name"
+
+    if ! docker exec "$container" true 2>/dev/null; then
+        log_error "Container '$container' is not running. Start the instance first."
+        return 1
+    fi
+
+    log_info "Setting ownership to www-data:www-data..."
+    docker exec "$container" chown -R www-data:www-data /var/www/html/wp-content
+
+    log_info "Setting permissions to 755..."
+    docker exec "$container" chmod -R 755 /var/www/html/wp-content
+
+    log_success "Permissions fixed. wp-content is now owned by www-data:www-data (755)."
+    return 0
+}
+
+################################################################################
 # Backup Instance
 ################################################################################
 
@@ -632,7 +725,8 @@ show_menu() {
     echo "4) List instances"
     echo "5) Backup instance"
     echo "6) Delete instance"
-    echo "7) Exit"
+    echo "7) Fix upload permissions"
+    echo "8) Exit"
     echo ""
 }
 
@@ -703,6 +797,10 @@ main() {
                     delete_instance "$instance_name"
                     ;;
                 7)
+                    instance_name=$(select_instance) || continue
+                    fix_permissions "$instance_name"
+                    ;;
+                8)
                     log_info "Goodbye!"
                     exit 0
                     ;;
@@ -718,13 +816,14 @@ main() {
         case $command in
             create)
                 if [ $# -lt 2 ]; then
-                    log_error "Usage: $0 create <instance_name> [wp_port] [pma_port]"
+                    log_error "Usage: $0 create <instance_name> [wp_port] [pma_port] [php_version]"
                     exit 1
                 fi
                 local instance_name=$2
                 local wp_port=$3
                 local pma_port=$4
-                create_instance "$instance_name" "$wp_port" "$pma_port"
+                local php_version=$5
+                create_instance "$instance_name" "$wp_port" "$pma_port" "$php_version"
                 ;;
             start)
                 if [ $# -lt 2 ]; then
@@ -757,16 +856,24 @@ main() {
                 fi
                 delete_instance "$2"
                 ;;
+            fix-permissions)
+                if [ $# -lt 2 ]; then
+                    log_error "Usage: $0 fix-permissions <instance_name>"
+                    exit 1
+                fi
+                fix_permissions "$2"
+                ;;
             *)
                 log_error "Unknown command: $command"
                 echo ""
                 log_info "Available commands:"
-                echo "  create <name> [wp_port] [pma_port]  - Create new instance"
+                echo "  create <name> [wp_port] [pma_port] [php_version]  - Create new instance"
                 echo "  start <name>                        - Start instance"
                 echo "  stop <name>                         - Stop instance"
                 echo "  list                                - List all instances"
                 echo "  backup <name>                       - Backup instance"
                 echo "  delete <name>                       - Delete instance"
+                echo "  fix-permissions <name>               - Fix wp-content upload permissions"
                 exit 1
                 ;;
         esac

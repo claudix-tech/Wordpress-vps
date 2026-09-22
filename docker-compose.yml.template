@@ -22,7 +22,7 @@ services:
 
   # WordPress Service
   wordpress_{{INSTANCE_NAME}}:
-    image: wordpress:latest
+    image: wordpress:php{{PHP_VERSION}}-apache
     container_name: wp-app-{{INSTANCE_NAME}}
     restart: always
     depends_on:

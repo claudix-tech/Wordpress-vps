@@ -21,6 +21,10 @@ from typing import Optional, Tuple
 # Global Docker Compose command (set by main())
 COMPOSE_CMD: Optional[str] = None
 
+# Supported PHP versions for the WordPress image (wordpress:php{VERSION}-apache)
+SUPPORTED_PHP_VERSIONS = ['8.2', '8.3']
+DEFAULT_PHP_VERSION = SUPPORTED_PHP_VERSIONS[0]
+
 # Colors for terminal output
 class Colors:
     HEADER = '\033[95m'
@@ -125,7 +129,7 @@ def is_port_in_use(port: int) -> bool:
     except OSError:
         return True
 
-def create_instance(instance_name: str, wp_port: Optional[int] = None, pma_port: Optional[int] = None) -> bool:
+def create_instance(instance_name: str, wp_port: Optional[int] = None, pma_port: Optional[int] = None, php_version: Optional[str] = None) -> bool:
     """Create a new WordPress instance"""
     
     print_header(f"Creating WordPress Instance: {instance_name}")
@@ -189,6 +193,31 @@ def create_instance(instance_name: str, wp_port: Optional[int] = None, pma_port:
 
     log_info(f"Using ports: WordPress={wp_port}, phpMyAdmin={pma_port}")
 
+    # Prompt for PHP version if not provided
+    if php_version is None:
+        if sys.stdin.isatty():
+            print("\nAvailable PHP versions:")
+            for idx, v in enumerate(SUPPORTED_PHP_VERSIONS, start=1):
+                print(f"  {idx}) PHP {v}")
+            val = input(f"Select PHP version [default: PHP {DEFAULT_PHP_VERSION}]: ").strip()
+            if not val:
+                php_version = DEFAULT_PHP_VERSION
+            elif val in SUPPORTED_PHP_VERSIONS:
+                php_version = val
+            else:
+                try:
+                    php_version = SUPPORTED_PHP_VERSIONS[int(val) - 1]
+                except (ValueError, IndexError):
+                    log_warn(f"Invalid selection, using default: PHP {DEFAULT_PHP_VERSION}")
+                    php_version = DEFAULT_PHP_VERSION
+        else:
+            php_version = DEFAULT_PHP_VERSION
+    elif php_version not in SUPPORTED_PHP_VERSIONS:
+        log_error(f"Unsupported PHP version: '{php_version}' (supported: {', '.join(SUPPORTED_PHP_VERSIONS)})")
+        return False
+
+    log_info(f"Using PHP version: {php_version}")
+
     # Create directories
     log_info("Creating instance directory structure...")
     instance_dir.mkdir(parents=True, exist_ok=True)
@@ -218,6 +247,7 @@ MYSQL_PASSWORD={mysql_password}
 WP_TABLE_PREFIX=wp_
 WP_PORT={wp_port}
 PMA_PORT={pma_port}
+PHP_VERSION={php_version}
 
 # Instance Metadata
 INSTANCE_NAME={instance_name}
@@ -237,7 +267,7 @@ INSTANCE_EMAIL=admin@{instance_name}.local
         return False
     
     template_content = template_file.read_text()
-    compose_content = template_content.replace('{{INSTANCE_NAME}}', instance_name)
+    compose_content = template_content.replace('{{INSTANCE_NAME}}', instance_name).replace('{{PHP_VERSION}}', php_version)
     
     compose_file = instance_dir / 'docker-compose.yml'
     compose_file.write_text(compose_content)
@@ -292,6 +322,7 @@ Thumbs.db
 - **Created**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 - **WordPress Port**: {wp_port}
 - **phpMyAdmin Port**: {pma_port}
+- **PHP Version**: {php_version}
 - **Database**: wordpress_{instance_name}
 - **DB User**: wp_{instance_name}
 
@@ -371,6 +402,43 @@ def start_instance(instance_name: str) -> bool:
         return True
     else:
         log_error("Failed to start instance")
+        return False
+
+def fix_permissions(instance_name: str) -> bool:
+    """Fix wp-content ownership/permissions (www-data:www-data, 755) inside a running instance.
+
+    Resolves the WordPress "... is not writable by the server" upload error, which happens
+    when files under wp-content (most often wp-content/uploads) end up owned by someone other
+    than www-data -- e.g. after a migration import run via `docker exec` (root by default) or
+    files copied in from the host as another user.
+    """
+
+    script_dir = Path(__file__).parent.resolve()
+    instance_dir = script_dir / 'instances' / instance_name
+
+    if not instance_dir.exists():
+        log_error(f"Instance '{instance_name}' not found")
+        return False
+
+    print_header(f"Fixing Permissions: {instance_name}")
+
+    container = f"wp-app-{instance_name}"
+
+    if subprocess.run(['docker', 'exec', container, 'true'], capture_output=True).returncode != 0:
+        log_error(f"Container '{container}' is not running. Start the instance first.")
+        return False
+
+    log_info("Setting ownership to www-data:www-data...")
+    subprocess.run(['docker', 'exec', container, 'chown', '-R', 'www-data:www-data', '/var/www/html/wp-content'])
+
+    log_info("Setting permissions to 755...")
+    result = subprocess.run(['docker', 'exec', container, 'chmod', '-R', '755', '/var/www/html/wp-content'])
+
+    if result.returncode == 0:
+        log_success("Permissions fixed. wp-content is now owned by www-data:www-data (755).")
+        return True
+    else:
+        log_error("Failed to fix permissions")
         return False
 
 def stop_instance(instance_name: str) -> bool:
@@ -566,6 +634,7 @@ Examples:
   %(prog)s list
   %(prog)s backup mysite
   %(prog)s delete mysite
+  %(prog)s fix-permissions mysite
         """
     )
     
@@ -578,6 +647,7 @@ Examples:
     create_parser.add_argument('pos_pma_port', nargs='?', type=int, default=None, help='phpMyAdmin port (positional)')
     create_parser.add_argument('--wp-port', dest='opt_wp_port', type=int, help='WordPress port (flag)')
     create_parser.add_argument('--pma-port', dest='opt_pma_port', type=int, help='phpMyAdmin port (flag)')
+    create_parser.add_argument('--php-version', dest='opt_php_version', choices=SUPPORTED_PHP_VERSIONS, help='PHP version for the WordPress image')
     
     # Start command
     start_parser = subparsers.add_parser('start', help='Start an instance')
@@ -586,6 +656,10 @@ Examples:
     # Stop command
     stop_parser = subparsers.add_parser('stop', help='Stop an instance')
     stop_parser.add_argument('name', help='Instance name')
+
+    # Fix permissions command
+    fix_parser = subparsers.add_parser('fix-permissions', help='Fix wp-content upload permissions (www-data:www-data, 755)')
+    fix_parser.add_argument('name', help='Instance name')
     
     # List command
     list_parser = subparsers.add_parser('list', help='List all instances')
@@ -607,11 +681,13 @@ Examples:
     if args.command == 'create':
         wp_port = args.opt_wp_port if args.opt_wp_port is not None else args.pos_wp_port
         pma_port = args.opt_pma_port if args.opt_pma_port is not None else args.pos_pma_port
-        success = create_instance(args.name, wp_port, pma_port)
+        success = create_instance(args.name, wp_port, pma_port, args.opt_php_version)
     elif args.command == 'start':
         success = start_instance(args.name)
     elif args.command == 'stop':
         success = stop_instance(args.name)
+    elif args.command == 'fix-permissions':
+        success = fix_permissions(args.name)
     elif args.command == 'list':
         success = list_instances()
     elif args.command == 'backup':

@@ -24,11 +24,13 @@ MYSQL_PASSWORD=SecureDbPassword456!
 WP_TABLE_PREFIX=wp_
 WP_PORT=8000
 PMA_PORT=8001
+PHP_VERSION=8.2
 ```
 
 - **Table Prefix**: Prefix for all WordPress tables (security by obscurity)
 - **WordPress Port**: Port to access WordPress (external)
 - **phpMyAdmin Port**: Port to access phpMyAdmin (external)
+- **PHP Version**: PHP version used by the WordPress image (`wordpress:php{version}-apache`). Selected when the instance is created (`8.2` or `8.3`, default `8.2`); changing it after creation means editing `.env` and `docker-compose.yml`'s `image:` line and recreating the container (`docker compose up -d --force-recreate wordpress_{instance}`).
 
 ### Custom WordPress Configuration
 
